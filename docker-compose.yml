@@ -1,0 +1,91 @@
+version: "3.7"
+services:
+  api:
+    depends_on:
+      db:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: some_api/Dockerfile
+    environment:
+      - PG_HOST=db
+      - PG_USER=postgres
+      - PG_PASS=postgres
+      - PG_DB=some_db
+      - PG_PORT=5432
+
+      - BROKER_HOST=queue
+      - BROKER_USER=guest
+      - BROKER_PASS=guest
+      - BROKER_VHOST=
+    ports:
+      - "5001:5000"
+  parner:
+    depends_on:
+      db:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: some_partner/Dockerfile
+    ports:
+      - "5002:5000"
+  worker:
+    depends_on:
+      db:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: some_worker/Dockerfile
+    environment:
+      - PG_HOST=db
+      - PG_USER=postgres
+      - PG_PASS=postgres
+      - PG_DB=some_db
+      - PG_PORT=5432
+      - PARTNER_HOST=http://parner:5000
+      - BROKER_HOST=queue
+      - BROKER_USER=guest
+      - BROKER_PASS=guest
+      - BROKER_VHOST=
+  pecker:
+    depends_on:
+      db:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: some_pecker/Dockerfile
+    environment:
+      - PG_HOST=db
+      - PG_USER=postgres
+      - PG_PASS=postgres
+      - PG_DB=some_db
+      - PG_PORT=5432
+      - PARTNER_HOST=http://parner:5000
+      - BROKER_HOST=queue
+      - BROKER_USER=guest
+      - BROKER_PASS=guest
+      - BROKER_VHOST=
+  db:
+    image: "postgres:12"
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=some_db
+      - POSTGRES_PORT=5432
+    volumes:
+      - "./tmp/postgres-data:/var/lib/postgresql/data"
+  queue:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - ./tmp/rabbit-data/:/var/lib/rabbitmq/
+      - ./tmp/rabbit-log/:/var/log/rabbitmq
